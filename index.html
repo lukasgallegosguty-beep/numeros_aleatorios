@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Números Aleatorios</title>
+<meta name="description" content="Generador de números aleatorios con mínimo, máximo e historial. Funciona sin conexión.">
+<meta name="theme-color" content="#1687d9">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Aleatorios">
+<style>
+:root {
+  --ink: #06304f;
+  --ink-soft: #2b5a7c;
+  --glass: rgba(255, 255, 255, .30);
+  --glass-strong: rgba(255, 255, 255, .58);
+  --edge: rgba(255, 255, 255, .75);
+  --shadow: 0 10px 30px rgba(4, 50, 100, .30);
+  --radius: clamp(16px, 2.4vw, 24px);
+  --gap: clamp(12px, 2.2vw, 22px);
+  --font: "Segoe UI", "Frutiger", "Frutiger Linotype", "Helvetica Neue", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { height: 100%; -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-family: var(--font);
+  color: var(--ink);
+  background:
+    radial-gradient(120% 60% at 50% 115%, rgba(150, 235, 90, .95) 0%, rgba(90, 210, 120, .55) 38%, transparent 70%),
+    radial-gradient(90% 55% at 100% 0%, rgba(120, 235, 255, .85) 0%, transparent 60%),
+    radial-gradient(80% 50% at 0% 10%, rgba(30, 110, 220, .9) 0%, transparent 65%),
+    linear-gradient(180deg, #0b63c4 0%, #1c9be6 45%, #58d0e8 75%, #8ee27c 100%);
+  background-attachment: fixed;
+  padding:
+    calc(var(--gap) + env(safe-area-inset-top))
+    calc(var(--gap) + env(safe-area-inset-right))
+    calc(var(--gap) + env(safe-area-inset-bottom))
+    calc(var(--gap) + env(safe-area-inset-left));
+  overflow-x: hidden;
+}
+
+/* Ondas de luz y burbujas del fondo */
+.sky { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+.sky::before, .sky::after {
+  content: ""; position: absolute; left: -20%; width: 140%; height: 46%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,0) 70%);
+  transform: rotate(-8deg);
+}
+.sky::before { top: -24%; }
+.sky::after { top: 34%; height: 40%; opacity: .45; transform: rotate(6deg); }
+.bubble {
+  position: absolute; border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 0 8%, rgba(255,255,255,.25) 22%, rgba(255,255,255,.06) 60%, rgba(255,255,255,.3) 100%);
+  border: 1px solid rgba(255,255,255,.5);
+  animation: float 14s ease-in-out infinite alternate;
+}
+@keyframes float { to { transform: translateY(-28px) translateX(10px); } }
+
+.app {
+  position: relative; z-index: 1;
+  max-width: 1100px; margin: 0 auto;
+  display: grid; gap: var(--gap);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+header { text-align: center; color: #fff; text-shadow: 0 1px 2px rgba(0, 40, 90, .65), 0 0 18px rgba(0, 60, 130, .45); }
+h1 { margin: 0; font-weight: 600; font-size: clamp(1.4rem, 4.2vw, 2.2rem); letter-spacing: .01em; }
+header p { margin: .25em 0 0; font-size: clamp(.85rem, 2.2vw, 1rem); opacity: .95; }
+
+/* Panel de vidrio */
+.glass {
+  position: relative;
+  background: linear-gradient(180deg, var(--glass-strong) 0%, var(--glass) 42%, rgba(255,255,255,.22) 100%);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(255,255,255,.3);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+  padding: clamp(14px, 3vw, 26px);
+  min-width: 0;
+}
+.glass h2 {
+  margin: 0 0 .7em; font-size: clamp(1rem, 2.6vw, 1.2rem); font-weight: 600;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+
+/* Pantalla del resultado */
+.screen {
+  container-type: inline-size;
+  border-radius: calc(var(--radius) - 4px);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,.08) 48%, rgba(0,0,0,0) 50%),
+    linear-gradient(180deg, #0c4f9e 0%, #0a74c9 55%, #2bb3e6 100%);
+  border: 1px solid rgba(255,255,255,.8);
+  box-shadow: inset 0 2px 10px rgba(0, 20, 60, .55), 0 1px 0 rgba(255,255,255,.7);
+  min-height: clamp(120px, 26vh, 220px);
+  display: grid; place-items: center;
+  padding: 10px 14px;
+  text-align: center;
+  overflow: hidden;
+}
+.number {
+  --len: 1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+  color: #fff;
+  text-shadow: 0 2px 3px rgba(0, 20, 60, .6), 0 0 22px rgba(140, 230, 255, .8);
+  font-size: 3rem;
+  font-size: clamp(1.4rem, calc(88cqw / (var(--len) * .62)), 6.5rem);
+  white-space: nowrap;
+}
+.number.placeholder { opacity: .75; }
+.number.pop { animation: pop .35s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes pop { from { transform: scale(.82); } to { transform: scale(1); } }
+.screen small { display: block; color: #dff4ff; font-size: clamp(.78rem, 2vw, .92rem); margin-top: 4px; text-shadow: 0 1px 2px rgba(0,20,60,.6); min-height: 1.3em; }
+
+/* Campos */
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); margin-top: var(--gap); }
+label { display: block; font-size: clamp(.82rem, 2vw, .95rem); font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+input[type="number"] {
+  width: 100%; min-width: 0;
+  font: inherit; font-size: clamp(1.05rem, 3vw, 1.3rem); font-weight: 600;
+  color: var(--ink); text-align: center;
+  padding: .6em .5em;
+  border-radius: 12px;
+  border: 1px solid rgba(20, 90, 150, .55);
+  background: linear-gradient(180deg, rgba(225, 240, 250, .95) 0%, #fff 30%);
+  box-shadow: inset 0 2px 4px rgba(0, 40, 90, .22), 0 1px 0 rgba(255,255,255,.8);
+  -moz-appearance: textfield; appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input:focus-visible, button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(10, 100, 200, .65); }
+
+.error {
+  margin: 10px 0 0; min-height: 1.4em;
+  font-size: clamp(.82rem, 2vw, .95rem); font-weight: 600; color: #8a1020;
+}
+.error:not(:empty) { background: rgba(255, 235, 238, .85); border: 1px solid rgba(170, 30, 50, .5); border-radius: 10px; padding: 6px 10px; }
+
+/* Botones brillantes */
+button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.go {
+  position: relative; overflow: hidden;
+  width: 100%; margin-top: 10px;
+  padding: .8em 1em; min-height: 54px;
+  font-size: clamp(1.1rem, 3.2vw, 1.35rem); font-weight: 700; letter-spacing: .02em;
+  color: #fff; text-shadow: 0 1px 2px rgba(0, 60, 20, .7);
+  border-radius: 999px;
+  border: 1px solid #1c7a22;
+  background: linear-gradient(180deg, #8fe36a 0%, #43b82f 48%, #238f1d 52%, #4fd03e 100%);
+  box-shadow: 0 6px 16px rgba(10, 90, 30, .45), inset 0 1px 0 rgba(255,255,255,.85), inset 0 -6px 12px rgba(190, 255, 150, .35);
+  transition: transform .08s ease, filter .15s ease;
+}
+.go::before {
+  content: ""; position: absolute; left: 3%; right: 3%; top: 2px; height: 46%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,.8), rgba(255,255,255,.12));
+  pointer-events: none;
+}
+.go:hover { filter: brightness(1.07); }
+.go:active { transform: translateY(1px) scale(.99); filter: brightness(.95); }
+
+.mini {
+  padding: .4em .9em; min-height: 36px;
+  font-size: .85rem; font-weight: 600; color: var(--ink);
+  border-radius: 999px; border: 1px solid rgba(20, 90, 150, .5);
+  background: linear-gradient(180deg, #fff 0%, #e4f1fa 48%, #c9e2f3 52%, #e9f5fc 100%);
+  box-shadow: 0 2px 5px rgba(0, 40, 90, .22), inset 0 1px 0 #fff;
+  white-space: nowrap;
+}
+.mini:hover { filter: brightness(1.04); }
+.mini.armed { color: #fff; border-color: #8d1420; text-shadow: 0 1px 1px rgba(80,0,0,.6);
+  background: linear-gradient(180deg, #f28a8f 0%, #d93a44 48%, #b81f2b 52%, #dd4b54 100%); }
+.mini[hidden] { display: none; }
+
+/* Historial */
+.history { display: flex; flex-direction: column; }
+.count { font-weight: 400; color: var(--ink-soft); font-size: .88em; }
+.list {
+  list-style: none; margin: 0; padding: 0 4px 0 0;
+  display: grid; gap: 8px;
+  overflow-y: auto; overscroll-behavior: contain;
+  max-height: 46vh; max-height: 46dvh;
+  scrollbar-width: thin; scrollbar-color: rgba(20, 90, 150, .55) transparent;
+}
+.list li {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 12px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.88) 0%, rgba(255,255,255,.55) 100%);
+  border: 1px solid rgba(255,255,255,.9);
+  box-shadow: 0 2px 6px rgba(0, 40, 90, .15);
+}
+.list .n {
+  font-size: clamp(1.25rem, 4vw, 1.6rem); font-weight: 700; font-variant-numeric: tabular-nums;
+  color: #0a5fb4; text-align: center; overflow-wrap: anywhere; min-width: 2.2em; max-width: 100%;
+}
+.list .meta { flex: 1 1 12.5em; min-width: 0; text-align: right; font-size: clamp(.8rem, 2.1vw, .92rem); }
+.list .range { font-weight: 600; overflow-wrap: anywhere; }
+.list time { display: block; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.empty { margin: 0; padding: 18px 8px; text-align: center; color: var(--ink-soft); }
+
+footer { text-align: center; color: #fff; font-size: .82rem; text-shadow: 0 1px 2px rgba(0, 60, 40, .7); }
+.status { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #c8ff9a; box-shadow: 0 0 8px #c8ff9a, inset 0 1px 0 #fff; }
+.dot.off { background: #ffd27a; box-shadow: 0 0 8px #ffd27a, inset 0 1px 0 #fff; }
+
+/* Pantallas anchas: generador a la izquierda, historial a la derecha */
+@media (min-width: 860px) {
+  .app { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); align-items: start; }
+  header, footer { grid-column: 1 / -1; }
+  .list { max-height: calc(100vh - 260px); max-height: calc(100dvh - 260px); min-height: 220px; }
+}
+/* Teléfonos muy angostos */
+@media (max-width: 330px) {
+  .fields { grid-template-columns: minmax(0, 1fr); }
+}
+/* Teléfono en horizontal: poca altura */
+@media (max-height: 480px) and (min-width: 560px) {
+  .app { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  header, footer { grid-column: 1 / -1; }
+  header p { display: none; }
+  .screen { min-height: 90px; }
+  .list { max-height: 60vh; max-height: 60dvh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bubble, .number.pop { animation: none; }
+  .go { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="sky" aria-hidden="true">
+  <span class="bubble" style="width:120px;height:120px;left:6%;top:12%"></span>
+  <span class="bubble" style="width:54px;height:54px;left:82%;top:22%;animation-delay:-4s"></span>
+  <span class="bubble" style="width:170px;height:170px;left:74%;top:62%;animation-delay:-8s"></span>
+  <span class="bubble" style="width:36px;height:36px;left:22%;top:72%;animation-delay:-2s"></span>
+  <span class="bubble" style="width:70px;height:70px;left:46%;top:88%;animation-delay:-6s"></span>
+</div>
+
+<main class="app">
+  <header>
+    <h1>Números Aleatorios</h1>
+    <p>Elige el mínimo y el máximo, y saca un número.</p>
+  </header>
+
+  <section class="glass" aria-label="Generador">
+    <div class="screen">
+      <div>
+        <div id="number" class="number placeholder" role="status" aria-live="polite">?</div>
+        <small id="caption"></small>
+      </div>
+    </div>
+
+    <form id="form" novalidate>
+      <div class="fields">
+        <div>
+          <label for="min">Mínimo</label>
+          <input id="min" type="number" step="1" value="1" autocomplete="off" required>
+        </div>
+        <div>
+          <label for="max">Máximo</label>
+          <input id="max" type="number" step="1" value="100" autocomplete="off" required>
+        </div>
+      </div>
+      <p id="error" class="error" role="alert"></p>
+      <button class="go" type="submit">Generar número</button>
+    </form>
+  </section>
+
+  <section class="glass history" aria-label="Historial">
+    <h2>
+      <span>Historial <span id="count" class="count"></span></span>
+      <button id="clear" class="mini" type="button" hidden>Borrar historial</button>
+    </h2>
+    <ul id="list" class="list"></ul>
+    <p id="empty" class="empty">Aún no hay números generados.</p>
+  </section>
+
+  <footer>
+    <span class="status"><span id="dot" class="dot"></span><span id="net"></span></span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  var KEY_HISTORY = 'aleatorios.historial.v1';
+  var KEY_RANGE = 'aleatorios.rango.v1';
+  var MAX_ITEMS = 1000;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var elMin = $('min'), elMax = $('max'), elNumber = $('number'), elCaption = $('caption');
+  var elError = $('error'), elList = $('list'), elEmpty = $('empty'), elCount = $('count');
+  var elClear = $('clear'), elDot = $('dot'), elNet = $('net');
+
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var history = [];
+  var rolling = null;
+
+  /* ---------- Almacenamiento (queda guardado en el dispositivo) ---------- */
+  function load(key, fallback) {
+    try { var v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; }
+    catch (e) { return fallback; }
+  }
+  function save(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* sin almacenamiento */ }
+  }
+
+  /* ---------- Número aleatorio entero, uniforme, entre min y max (inclusive) ---------- */
+  function randomInt(min, max) {
+    var range = BigInt(max) - BigInt(min) + 1n;
+    var TWO64 = 1n << 64n;
+    var limit = TWO64 - (TWO64 % range); // se descartan valores sobre el límite para evitar sesgo
+    var buf = new Uint32Array(2), r;
+    do {
+      crypto.getRandomValues(buf);
+      r = (BigInt(buf[0]) << 32n) | BigInt(buf[1]);
+    } while (r >= limit);
+    return Number(BigInt(min) + (r % range));
+  }
+
+  /* ---------- Presentación ---------- */
+  var fmtDate = new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  function fmtNum(n) { return n.toLocaleString('es-CL'); }
+
+  function showNumber(n, placeholder) {
+    var text = placeholder ? '?' : fmtNum(n);
+    elNumber.textContent = text;
+    elNumber.style.setProperty('--len', Math.max(text.length, 2));
+    elNumber.classList.toggle('placeholder', !!placeholder);
+  }
+
+  function renderItem(item) {
+    var li = document.createElement('li');
+    var n = document.createElement('span'); n.className = 'n'; n.textContent = fmtNum(item.n);
+    var meta = document.createElement('div'); meta.className = 'meta';
+    var range = document.createElement('span'); range.className = 'range';
+    range.textContent = 'Mín ' + fmtNum(item.min) + ' · Máx ' + fmtNum(item.max);
+    var time = document.createElement('time'); time.dateTime = item.t;
+    time.textContent = fmtDate.format(new Date(item.t));
+    meta.appendChild(range); meta.appendChild(time);
+    li.appendChild(n); li.appendChild(meta);
+    return li;
+  }
+
+  function renderHistory() {
+    elList.textContent = '';
+    var frag = document.createDocumentFragment();
+    history.forEach(function (item) { frag.appendChild(renderItem(item)); });
+    elList.appendChild(frag);
+    updateHistoryChrome();
+  }
+
+  function updateHistoryChrome() {
+    var has = history.length > 0;
+    elEmpty.hidden = has;
+    elList.hidden = !has;
+    elClear.hidden = !has;
+    elCount.textContent = has ? '(' + history.length + ')' : '';
+  }
+
+  /* ---------- Validación ---------- */
+  function readInt(el, name) {
+    var raw = el.value.trim();
+    if (raw === '') return { error: 'Escribe el ' + name + '.' };
+    var v = Number(raw);
+    if (!Number.isFinite(v) || !Number.isInteger(v)) return { error: 'El ' + name + ' debe ser un número entero.' };
+    if (!Number.isSafeInteger(v)) return { error: 'El ' + name + ' es demasiado grande.' };
+    return { value: v };
+  }
+
+  function generate() {
+    var a = readInt(elMin, 'mínimo'), b = readInt(elMax, 'máximo');
+    var err = a.error || b.error;
+    if (!err && a.value > b.value) err = 'El mínimo no puede ser mayor que el máximo.';
+    elError.textContent = err || '';
+    if (err) return;
+
+    var min = a.value, max = b.value;
+    var n = randomInt(min, max);
+    var item = { n: n, min: min, max: max, t: new Date().toISOString() };
+
+    history.unshift(item);
+    if (history.length > MAX_ITEMS) history.length = MAX_ITEMS;
+    save(KEY_HISTORY, history);
+    save(KEY_RANGE, { min: min, max: max });
+
+    elCaption.textContent = 'Entre ' + fmtNum(min) + ' y ' + fmtNum(max);
+    reveal(item, min, max);
+  }
+
+  function reveal(item, min, max) {
+    if (rolling) { clearInterval(rolling.timer); rolling.finish(); }
+    var finish = function () {
+      rolling = null;
+      showNumber(item.n);
+      elNumber.classList.remove('pop'); void elNumber.offsetWidth; elNumber.classList.add('pop');
+      elList.insertBefore(renderItem(item), elList.firstChild);
+      while (elList.children.length > history.length) elList.removeChild(elList.lastChild);
+      updateHistoryChrome();
+      elList.scrollTop = 0;
+    };
+    if (reduceMotion || min === max) { finish(); return; }
+    var ticks = 0;
+    rolling = { finish: finish, timer: setInterval(function () {
+      showNumber(randomInt(min, max));
+      if (++ticks >= 9) { clearInterval(rolling.timer); finish(); }
+    }, 55) };
+  }
+
+  /* ---------- Borrar historial (pide confirmar con un segundo toque) ---------- */
+  var armTimer = null;
+  function disarm() {
+    clearTimeout(armTimer);
+    elClear.classList.remove('armed');
+    elClear.textContent = 'Borrar historial';
+  }
+  elClear.addEventListener('click', function () {
+    if (!elClear.classList.contains('armed')) {
+      elClear.classList.add('armed');
+      elClear.textContent = '¿Seguro? Toca de nuevo';
+      armTimer = setTimeout(disarm, 3500);
+      return;
+    }
+    disarm();
+    history = [];
+    save(KEY_HISTORY, history);
+    renderHistory();
+  });
+
+  /* ---------- Estado de conexión ---------- */
+  function updateNet() {
+    var on = navigator.onLine;
+    elDot.classList.toggle('off', !on);
+    elNet.textContent = on ? 'Lista para usar sin conexión' : 'Sin conexión: la app sigue funcionando';
+  }
+  window.addEventListener('online', updateNet);
+  window.addEventListener('offline', updateNet);
+
+  /* ---------- Inicio ---------- */
+  $('form').addEventListener('submit', function (e) { e.preventDefault(); generate(); });
+  [elMin, elMax].forEach(function (el) {
+    el.addEventListener('input', function () { elError.textContent = ''; });
+    el.addEventListener('focus', function () { el.select(); });
+  });
+
+  var saved = load(KEY_HISTORY, []);
+  history = Array.isArray(saved) ? saved.filter(function (x) {
+    return x && Number.isSafeInteger(x.n) && Number.isSafeInteger(x.min) && Number.isSafeInteger(x.max) && !isNaN(Date.parse(x.t));
+  }) : [];
+  var lastRange = load(KEY_RANGE, null);
+  if (lastRange && Number.isSafeInteger(lastRange.min) && Number.isSafeInteger(lastRange.max)) {
+    elMin.value = lastRange.min; elMax.value = lastRange.max;
+  }
+  showNumber(0, true);
+  renderHistory();
+  updateNet();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () { /* sin soporte offline */ });
+    });
+  }
+})();
+</script>
+</body>
+</html>
