@@ -145,8 +145,9 @@ input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 input:focus-visible, button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(10, 100, 200, .65); }
 
+.left { margin: 10px 0 0; min-height: 1.3em; text-align: center; font-size: clamp(.82rem, 2vw, .95rem); font-weight: 600; color: var(--ink); }
 .error {
-  margin: 10px 0 0; min-height: 1.4em;
+  margin: 6px 0 0; min-height: 1.4em;
   font-size: clamp(.82rem, 2vw, .95rem); font-weight: 600; color: #8a1020;
 }
 .error:not(:empty) { background: rgba(255, 235, 238, .85); border: 1px solid rgba(170, 30, 50, .5); border-radius: 10px; padding: 6px 10px; }
@@ -283,6 +284,7 @@ footer details[hidden] { display: none; }
           <input id="max" type="number" step="1" value="100" autocomplete="off" required>
         </div>
       </div>
+      <p id="left" class="left"></p>
       <p id="error" class="error" role="alert"></p>
       <button class="go" type="submit">Generar número</button>
     </form>
@@ -315,12 +317,12 @@ footer details[hidden] { display: none; }
 
   var KEY_HISTORY = 'aleatorios.historial.v1';
   var KEY_RANGE = 'aleatorios.rango.v1';
-  var MAX_ITEMS = 1000;
+  var MAX_ITEMS = 5000;
 
   var $ = function (id) { return document.getElementById(id); };
   var elMin = $('min'), elMax = $('max'), elNumber = $('number'), elCaption = $('caption');
   var elError = $('error'), elList = $('list'), elEmpty = $('empty'), elCount = $('count');
-  var elClear = $('clear'), elDot = $('dot'), elNet = $('net');
+  var elLeft = $('left'), elClear = $('clear'), elDot = $('dot'), elNet = $('net');
 
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var history = [];
@@ -398,6 +400,32 @@ footer details[hidden] { display: none; }
     return { value: v };
   }
 
+  /* ---------- Sin repetición: números que ya salieron en un rango (según el historial) ---------- */
+  function usedIn(min, max) {
+    var set = new Set();
+    history.forEach(function (x) { if (x.min === min && x.max === max) set.add(x.n); });
+    return set;
+  }
+  function pickUnused(min, max, used, total) {
+    if (used.size === 0) return randomInt(min, max);
+    if (total <= 20000) {            // rango chico: se elige entre los que quedan
+      var rest = [];
+      for (var v = min; v <= max; v++) if (!used.has(v)) rest.push(v);
+      return rest[randomInt(0, rest.length - 1)];
+    }
+    var n;                           // rango grande: se repite el sorteo si sale uno usado
+    do { n = randomInt(min, max); } while (used.has(n));
+    return n;
+  }
+  function updateLeft() {
+    var a = readInt(elMin, ''), b = readInt(elMax, '');
+    if (a.error || b.error || a.value > b.value) { elLeft.textContent = ''; return; }
+    var total = b.value - a.value + 1, used = usedIn(a.value, b.value).size;
+    elLeft.textContent = used === 0
+      ? 'Disponibles en este rango: ' + fmtNum(total)
+      : 'Disponibles en este rango: ' + fmtNum(Math.max(total - used, 0)) + ' de ' + fmtNum(total) + ' (sin repetir)';
+  }
+
   function generate() {
     var a = readInt(elMin, 'mínimo'), b = readInt(elMax, 'máximo');
     var err = a.error || b.error;
@@ -406,13 +434,19 @@ footer details[hidden] { display: none; }
     if (err) return;
 
     var min = a.value, max = b.value;
-    var n = randomInt(min, max);
+    var used = usedIn(min, max), total = max - min + 1;
+    if (used.size >= total) {
+      elError.textContent = 'Ya salieron todos los números entre ' + fmtNum(min) + ' y ' + fmtNum(max) + '. Borra el historial para volver a sortear este rango.';
+      return;
+    }
+    var n = pickUnused(min, max, used, total);
     var item = { n: n, min: min, max: max, t: new Date().toISOString() };
 
     history.unshift(item);
     if (history.length > MAX_ITEMS) history.length = MAX_ITEMS;
     save(KEY_HISTORY, history);
     save(KEY_RANGE, { min: min, max: max });
+    updateLeft();
 
     elCaption.textContent = 'Entre ' + fmtNum(min) + ' y ' + fmtNum(max);
     reveal(item, min, max);
@@ -455,6 +489,8 @@ footer details[hidden] { display: none; }
     history = [];
     save(KEY_HISTORY, history);
     renderHistory();
+    elError.textContent = '';
+    updateLeft();
   });
 
   /* ---------- Estado de conexión ---------- */
@@ -495,7 +531,7 @@ footer details[hidden] { display: none; }
   /* ---------- Inicio ---------- */
   $('form').addEventListener('submit', function (e) { e.preventDefault(); generate(); });
   [elMin, elMax].forEach(function (el) {
-    el.addEventListener('input', function () { elError.textContent = ''; });
+    el.addEventListener('input', function () { elError.textContent = ''; updateLeft(); });
     el.addEventListener('focus', function () { el.select(); });
   });
 
@@ -509,6 +545,7 @@ footer details[hidden] { display: none; }
   }
   showNumber(0, true);
   renderHistory();
+  updateLeft();
   updateNet();
 
   if ('serviceWorker' in navigator) {

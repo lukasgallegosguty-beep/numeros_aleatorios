@@ -8,6 +8,7 @@ App móvil (PWA) para generar números aleatorios entre un mínimo y un máximo,
 
 - Genera un número entero al azar entre el mínimo y el máximo (ambos incluidos; acepta negativos).
 - Guarda un historial con fecha y hora, mínimo, máximo y número obtenido.
+- **Sin repetición:** un número que ya salió en un rango (mismo mínimo y máximo) no vuelve a salir hasta que se borre el historial. Pensada para muestreo aleatorio por niveles (contenedor → pallet → caja → unidad).
 - Funciona sin conexión después de abrirla una vez con internet.
 - Se adapta a teléfonos, tablets y computadores.
 
@@ -29,4 +30,4 @@ El historial se guarda en cada dispositivo (no se comparte entre teléfonos).
 | `manifest.webmanifest` | Datos de instalación (nombre, íconos, colores) |
 | `icons/` | Íconos de la app |
 
-Al modificar la app, sube la versión de `CACHE` en `sw.js` (por ejemplo `aleatorios-v2`) para que los teléfonos descarguen la versión nueva.
+Al modificar la app, sube la versión de `CACHE` en `sw.js` (por ejemplo `aleatorios-v4`) para que los teléfonos descarguen la versión nueva.

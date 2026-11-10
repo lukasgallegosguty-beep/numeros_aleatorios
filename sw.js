@@ -1,6 +1,6 @@
 /* Service worker: guarda la app en el dispositivo para que funcione sin conexión.
    Al cambiar archivos de la app, sube el número de versión para forzar la actualización. */
-const CACHE = 'aleatorios-v2';
+const CACHE = 'aleatorios-v3';
 const ASSETS = [
   './',
   './index.html',
