@@ -215,7 +215,13 @@ button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparen
 .empty { margin: 0; padding: 18px 8px; text-align: center; color: var(--ink-soft); }
 
 footer { text-align: center; color: #fff; font-size: .82rem; text-shadow: 0 1px 2px rgba(0, 60, 40, .7); }
+footer { display: grid; justify-items: center; gap: 10px; }
 .status { display: inline-flex; align-items: center; gap: 6px; }
+footer details { max-width: 34em; }
+footer summary { cursor: pointer; text-decoration: underline; padding: 6px; }
+footer details p { margin: 6px 0 0; padding: 10px 14px; text-align: left; line-height: 1.5; color: var(--ink); text-shadow: none;
+  background: rgba(255,255,255,.8); border: 1px solid #fff; border-radius: 14px; }
+footer details[hidden] { display: none; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: #c8ff9a; box-shadow: 0 0 8px #c8ff9a, inset 0 1px 0 #fff; }
 .dot.off { background: #ffd27a; box-shadow: 0 0 8px #ffd27a, inset 0 1px 0 #fff; }
 
@@ -292,7 +298,14 @@ footer { text-align: center; color: #fff; font-size: .82rem; text-shadow: 0 1px 
   </section>
 
   <footer>
-    <span class="status"><span id="dot" class="dot"></span><span id="net"></span></span>
+    <div class="status"><span id="dot" class="dot off"></span><span id="net"></span></div>
+    <button id="install" class="mini" type="button" hidden>Instalar app</button>
+    <details id="howto">
+      <summary>¿Cómo instalarla en el teléfono?</summary>
+      <p><b>Android (Chrome):</b> menú ⋮ arriba a la derecha → <i>Agregar a pantalla principal</i> → <i>Instalar</i>.<br>
+      <b>iPhone (Safari):</b> botón Compartir → <i>Agregar a inicio</i>.<br>
+      Ábrela directamente en Chrome o Safari, no dentro de otra app (WhatsApp, Instagram, Gmail).</p>
+    </details>
   </footer>
 </main>
 
@@ -445,11 +458,37 @@ footer { text-align: center; color: #fff; font-size: .82rem; text-shadow: 0 1px 
   });
 
   /* ---------- Estado de conexión ---------- */
+  var offlineReady = false;
   function updateNet() {
-    var on = navigator.onLine;
-    elDot.classList.toggle('off', !on);
-    elNet.textContent = on ? 'Lista para usar sin conexión' : 'Sin conexión: la app sigue funcionando';
+    var text;
+    if (!navigator.onLine) text = 'Sin conexión: la app sigue funcionando';
+    else if (offlineReady) text = 'Guardada en este dispositivo: funciona sin conexión';
+    else if (!('serviceWorker' in navigator)) text = 'Este navegador no permite usarla sin conexión';
+    else text = 'Guardando para usar sin conexión…';
+    elDot.classList.toggle('off', !offlineReady);
+    elNet.textContent = text;
   }
+  function checkOffline() {
+    if (!('serviceWorker' in navigator) || !window.caches) return;
+    navigator.serviceWorker.ready
+      .then(function () { return caches.match('index.html'); })
+      .then(function (hit) { offlineReady = !!hit; updateNet(); })
+      .catch(function () {});
+  }
+
+  /* ---------- Instalación ---------- */
+  var elInstall = $('install'), elHowto = $('howto'), installEvent = null;
+  var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  if (standalone) elHowto.hidden = true;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault(); installEvent = e; elInstall.hidden = false;
+  });
+  elInstall.addEventListener('click', function () {
+    if (!installEvent) return;
+    installEvent.prompt();
+    installEvent.userChoice.then(function () { installEvent = null; elInstall.hidden = true; });
+  });
+  window.addEventListener('appinstalled', function () { elInstall.hidden = true; elHowto.hidden = true; });
   window.addEventListener('online', updateNet);
   window.addEventListener('offline', updateNet);
 
@@ -474,7 +513,7 @@ footer { text-align: center; color: #fff; font-size: .82rem; text-shadow: 0 1px 
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').catch(function () { /* sin soporte offline */ });
+      navigator.serviceWorker.register('sw.js').then(checkOffline).catch(function () { /* sin soporte offline */ });
     });
   }
 })();

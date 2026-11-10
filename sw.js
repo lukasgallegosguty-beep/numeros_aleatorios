@@ -1,49 +1,60 @@
 /* Service worker: guarda la app en el dispositivo para que funcione sin conexión.
    Al cambiar archivos de la app, sube el número de versión para forzar la actualización. */
-const CACHE = 'aleatorios-v1';
+const CACHE = 'aleatorios-v2';
 const ASSETS = [
   './',
-  'index.html',
-  'manifest.webmanifest',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/icon-maskable-512.png',
-  'icons/apple-touch-icon.png'
+  './index.html',
+  './manifest.webmanifest',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon-maskable-512.png',
+  './icons/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      // Cada archivo se guarda por separado: si uno falla, los demás igual quedan guardados.
+      .then((cache) => Promise.allSettled(ASSETS.map((url) => cache.add(new Request(url, { cache: 'reload' })))))
+      .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('aleatorios-') && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
-// Responde desde la copia guardada y, si hay conexión, la actualiza en segundo plano.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
 
-  event.respondWith(
-    caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(req, { ignoreSearch: true });
-      const network = fetch(req)
+  if (req.mode === 'navigate') {
+    // La página: primero la red (para recibir actualizaciones); sin conexión, la copia guardada.
+    event.respondWith(
+      fetch(req)
         .then((res) => {
-          if (res && res.ok) cache.put(req, res.clone());
+          if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put('./index.html', copy)); }
           return res;
         })
-        .catch(() => null);
-      if (cached) { event.waitUntil(network); return cached; }
-      const res = await network;
-      if (res) return res;
-      if (req.mode === 'navigate') return cache.match('index.html');
-      return Response.error();
+        .catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // Resto de archivos: la copia guardada al instante y actualización en segundo plano.
+  event.respondWith(
+    caches.match(req, { ignoreSearch: true }).then((cached) => {
+      const network = fetch(req)
+        .then((res) => {
+          if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+          return res;
+        })
+        .catch(() => cached || Response.error());
+      return cached || network;
     })
   );
 });
